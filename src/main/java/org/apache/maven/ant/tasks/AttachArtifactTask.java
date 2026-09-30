@@ -20,15 +20,15 @@ package org.apache.maven.ant.tasks;
 
 import java.io.File;
 
+import org.apache.maven.api.ProducedArtifact;
+import org.apache.maven.api.Session;
+import org.apache.maven.api.services.ProjectManager;
 import org.apache.maven.plugins.antrun.AntRunMojo;
 import org.apache.maven.plugins.antrun.MavenAntRunProject;
 import org.apache.maven.plugins.antrun.taskconfig.AttachArtifactConfiguration;
-import org.apache.maven.project.MavenProject;
-import org.apache.maven.project.MavenProjectHelper;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.Task;
-import org.codehaus.plexus.util.FileUtils;
 
 /**
  *
@@ -41,10 +41,10 @@ public class AttachArtifactTask extends Task {
     private String mavenProjectRefId = AntRunMojo.DEFAULT_MAVEN_PROJECT_REF_REFID;
 
     /**
-     * The refId of the Maven project helper component.
+     * The refId of the Maven session.
      */
     @SuppressWarnings("FieldCanBeLocal")
-    private String mavenProjectHelperRefId = AntRunMojo.DEFAULT_MAVEN_PROJECT_HELPER_REFID;
+    private String mavenSessionRefId = AntRunMojo.DEFAULT_MAVEN_SESSION_REFID;
 
     private AttachArtifactConfiguration configuration = new AttachArtifactConfiguration();
 
@@ -65,20 +65,32 @@ public class AttachArtifactTask extends Task {
 
         String type = configuration.getType();
         if (type == null) {
-            type = FileUtils.getExtension(file.getName());
+            type = extension(file.getName());
         }
 
-        MavenProject mavenProject =
+        org.apache.maven.api.Project mavenProject =
                 ((MavenAntRunProject) this.getProject().getReference(mavenProjectRefId)).getMavenProject();
 
-        if (this.getProject().getReference(mavenProjectHelperRefId) == null) {
-            throw new BuildException("Maven project helper reference not found: " + mavenProjectHelperRefId);
+        if (this.getProject().getReference(mavenSessionRefId) == null) {
+            throw new BuildException("Maven session reference not found: " + mavenSessionRefId);
         }
 
         String classifier = configuration.getClassifier();
         log("Attaching " + file + " as an attached artifact", Project.MSG_VERBOSE);
-        MavenProjectHelper projectHelper = getProject().getReference(mavenProjectHelperRefId);
-        projectHelper.attachArtifact(mavenProject, type, classifier, file);
+        Session session = getProject().getReference(mavenSessionRefId);
+        ProducedArtifact artifact = session.createProducedArtifact(
+                mavenProject.getGroupId(),
+                mavenProject.getArtifactId(),
+                mavenProject.getVersion(),
+                classifier,
+                type,
+                type);
+        session.getService(ProjectManager.class).attachArtifact(mavenProject, artifact, file.toPath());
+    }
+
+    private static String extension(String fileName) {
+        int dot = fileName.lastIndexOf('.');
+        return dot < 0 ? "" : fileName.substring(dot + 1);
     }
 
     /**

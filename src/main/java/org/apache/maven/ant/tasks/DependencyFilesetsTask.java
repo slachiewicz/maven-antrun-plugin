@@ -18,22 +18,21 @@
  */
 package org.apache.maven.ant.tasks;
 
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Predicate;
 
-import org.apache.maven.RepositoryUtils;
 import org.apache.maven.ant.tasks.support.SpecificScopesArtifactFilter;
 import org.apache.maven.ant.tasks.support.TypesArtifactFilter;
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.resolver.filter.AndArtifactFilter;
+import org.apache.maven.api.Dependency;
+import org.apache.maven.api.LocalRepository;
+import org.apache.maven.api.Session;
 import org.apache.maven.plugins.antrun.AntRunMojo;
+import org.apache.maven.plugins.antrun.MavenAntRunDependency;
 import org.apache.maven.plugins.antrun.taskconfig.DependencyFilesetsConfiguration;
-import org.apache.maven.project.MavenProject;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Task;
 import org.apache.tools.ant.types.FileSet;
-import org.eclipse.aether.repository.LocalRepository;
-import org.eclipse.aether.repository.LocalRepositoryManager;
 
 /**
  * Ant task which create a fileset for each dependency in a Maven project, and a
@@ -56,16 +55,21 @@ public class DependencyFilesetsTask extends Task {
             throw new BuildException("Maven project reference not found: " + mavenProjectId);
         }
 
-        MavenProject mavenProject = this.getProject().getReference("maven.project");
+        List<MavenAntRunDependency> dependencies =
+                getProject().getReference(AntRunMojo.DEFAULT_MAVEN_DEPENDENCIES_REFID);
+        if (dependencies == null) {
+            throw new BuildException(
+                    "Maven dependencies reference not found: " + AntRunMojo.DEFAULT_MAVEN_DEPENDENCIES_REFID);
+        }
 
         // Add filesets for depenedency artifacts
-        Set<Artifact> depArtifacts = filterArtifacts(mavenProject.getArtifacts());
+        List<MavenAntRunDependency> depArtifacts = filterArtifacts(dependencies);
 
         FileSet dependenciesFileSet = new FileSet();
         dependenciesFileSet.setProject(getProject());
-        LocalRepository localRepository = getProject().getReference("maven.local.repository");
-        LocalRepositoryManager localRepositoryManager = getProject().getReference("maven.local.repository.manager");
-        dependenciesFileSet.setDir(localRepository.getBasedir());
+        LocalRepository localRepository = getProject().getReference(AntRunMojo.MAVEN_REFID_PREFIX + "local.repository");
+        Session session = getProject().getReference(AntRunMojo.DEFAULT_MAVEN_SESSION_REFID);
+        dependenciesFileSet.setDir(localRepository.getPath().toFile());
 
         if (depArtifacts.isEmpty()) {
             // For performance reasons in case of huge local repo, tell Ant to include a single thing, otherwise the
@@ -74,16 +78,19 @@ public class DependencyFilesetsTask extends Task {
             dependenciesFileSet.createExclude().setName("**");
         }
 
-        for (Artifact artifact : depArtifacts) {
-            String relativeArtifactPath =
-                    localRepositoryManager.getPathForLocalArtifact(RepositoryUtils.toArtifact(artifact));
+        for (MavenAntRunDependency artifact : depArtifacts) {
+            java.nio.file.Path localPath = session.getPathForLocalArtifact(artifact.dependency());
+            if (localPath.isAbsolute()) {
+                localPath = localRepository.getPath().relativize(localPath);
+            }
+            String relativeArtifactPath = localPath.toString().replace('\\', '/');
             dependenciesFileSet.createInclude().setName(relativeArtifactPath);
 
             String fileSetName = getPrefix() + artifact.getDependencyConflictId();
 
             FileSet singleArtifactFileSet = new FileSet();
             singleArtifactFileSet.setProject(getProject());
-            singleArtifactFileSet.setFile(artifact.getFile());
+            singleArtifactFileSet.setFile(artifact.path().toFile());
             getProject().addReference(fileSetName, singleArtifactFileSet);
         }
 
@@ -168,10 +175,10 @@ public class DependencyFilesetsTask extends Task {
     /**
      * Filter a set of artifacts using the scopes and type filters.
      *
-     * @param artifacts {@link Artifact} set.
-     * @return The set of filtered artifacts.
+     * @param artifacts the resolved dependencies.
+     * @return The filtered dependencies.
      */
-    public Set<Artifact> filterArtifacts(Set<Artifact> artifacts) {
+    public List<MavenAntRunDependency> filterArtifacts(List<MavenAntRunDependency> artifacts) {
         String scopes = getScopes();
         if (scopes == null) {
             scopes = "";
@@ -186,17 +193,17 @@ public class DependencyFilesetsTask extends Task {
             return artifacts;
         }
 
-        AndArtifactFilter filter = new AndArtifactFilter();
+        Predicate<Dependency> filter = dependency -> true;
         if (!"".equals(scopes)) {
-            filter.add(new SpecificScopesArtifactFilter(getScopes()));
+            filter = filter.and(new SpecificScopesArtifactFilter(getScopes()));
         }
         if (!"".equals(types)) {
-            filter.add(new TypesArtifactFilter(getTypes()));
+            filter = filter.and(new TypesArtifactFilter(getTypes()));
         }
 
-        Set<Artifact> artifactsResult = new LinkedHashSet<>();
-        for (Artifact artifact : artifacts) {
-            if (filter.include(artifact)) {
+        List<MavenAntRunDependency> artifactsResult = new ArrayList<>();
+        for (MavenAntRunDependency artifact : artifacts) {
+            if (filter.test(artifact.dependency())) {
                 artifactsResult.add(artifact);
             }
         }

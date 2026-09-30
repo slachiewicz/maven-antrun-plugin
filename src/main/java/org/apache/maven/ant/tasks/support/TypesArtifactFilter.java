@@ -20,14 +20,14 @@ package org.apache.maven.ant.tasks.support;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
+import org.apache.maven.api.Dependency;
 
 /**
  * Artifact Filter which filters on artifact types.
  */
-public class TypesArtifactFilter implements ArtifactFilter {
+public class TypesArtifactFilter implements Predicate<Dependency> {
     private List<String> types = new ArrayList<>();
 
     /**
@@ -45,8 +45,9 @@ public class TypesArtifactFilter implements ArtifactFilter {
 
     /** {@inheritDoc} */
     @Override
-    public boolean include(Artifact artifact) {
-        String artifactType = artifact.getType();
+    public boolean test(Dependency artifact) {
+        String artifactType =
+                artifact.getType() == null ? null : artifact.getType().id();
         if (artifactType == null || artifactType.equals("")) {
             artifactType = "jar";
         }
