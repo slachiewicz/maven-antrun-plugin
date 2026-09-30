@@ -18,7 +18,7 @@
  */
 package org.apache.maven.plugins.antrun;
 
-import org.apache.maven.project.MavenProject;
+import org.apache.maven.api.Project;
 
 /**
  * Encapsulates a Maven project with an unsupported clone operation. This makes sure that, when used as a reference in
@@ -29,13 +29,13 @@ import org.apache.maven.project.MavenProject;
  */
 public class MavenAntRunProject {
 
-    private MavenProject mavenProject;
+    private final Project mavenProject;
 
-    public MavenAntRunProject(MavenProject mavenProject) {
+    public MavenAntRunProject(Project mavenProject) {
         this.mavenProject = mavenProject;
     }
 
-    public MavenProject getMavenProject() {
+    public Project getMavenProject() {
         return mavenProject;
     }
 }

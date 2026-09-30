@@ -18,15 +18,16 @@
  */
 package org.apache.maven.ant.tasks.support;
 
-import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.resolver.filter.ArtifactFilter;
+import java.util.function.Predicate;
+
+import org.apache.maven.api.Dependency;
 
 /**
  * Filter to only retain objects in the given scope(s).
  *
  * @author pgier
  */
-public class SpecificScopesArtifactFilter implements ArtifactFilter {
+public class SpecificScopesArtifactFilter implements Predicate<Dependency> {
     private boolean compileScope;
 
     private boolean runtimeScope;
@@ -46,15 +47,15 @@ public class SpecificScopesArtifactFilter implements ArtifactFilter {
         String[] scopeList = scopes.split(",");
 
         for (String aScopeList : scopeList) {
-            if (aScopeList.trim().equals(Artifact.SCOPE_COMPILE)) {
+            if (aScopeList.trim().equals("compile")) {
                 compileScope = true;
-            } else if (aScopeList.trim().equals(Artifact.SCOPE_PROVIDED)) {
+            } else if (aScopeList.trim().equals("provided")) {
                 providedScope = true;
-            } else if (aScopeList.trim().equals(Artifact.SCOPE_RUNTIME)) {
+            } else if (aScopeList.trim().equals("runtime")) {
                 runtimeScope = true;
-            } else if (aScopeList.trim().equals(Artifact.SCOPE_SYSTEM)) {
+            } else if (aScopeList.trim().equals("system")) {
                 systemScope = true;
-            } else if (aScopeList.trim().equals(Artifact.SCOPE_TEST)) {
+            } else if (aScopeList.trim().equals("test")) {
                 testScope = true;
             }
         }
@@ -62,19 +63,23 @@ public class SpecificScopesArtifactFilter implements ArtifactFilter {
 
     /** {@inheritDoc} */
     @Override
-    public boolean include(Artifact artifact) {
-        if (Artifact.SCOPE_COMPILE.equals(artifact.getScope())) {
+    public boolean test(Dependency artifact) {
+        if ("compile".equals(scopeId(artifact))) {
             return compileScope;
-        } else if (Artifact.SCOPE_RUNTIME.equals(artifact.getScope())) {
+        } else if ("runtime".equals(scopeId(artifact))) {
             return runtimeScope;
-        } else if (Artifact.SCOPE_TEST.equals(artifact.getScope())) {
+        } else if ("test".equals(scopeId(artifact))) {
             return testScope;
-        } else if (Artifact.SCOPE_PROVIDED.equals(artifact.getScope())) {
+        } else if ("provided".equals(scopeId(artifact))) {
             return providedScope;
-        } else if (Artifact.SCOPE_SYSTEM.equals(artifact.getScope())) {
+        } else if ("system".equals(scopeId(artifact))) {
             return systemScope;
         } else {
             return true;
         }
+    }
+
+    private static String scopeId(Dependency dependency) {
+        return dependency.getScope() == null ? null : dependency.getScope().id();
     }
 }

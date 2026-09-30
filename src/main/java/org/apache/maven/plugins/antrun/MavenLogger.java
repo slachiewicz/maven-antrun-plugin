@@ -20,7 +20,7 @@ package org.apache.maven.plugins.antrun;
 
 import java.io.PrintStream;
 
-import org.apache.maven.plugin.logging.Log;
+import org.apache.maven.api.plugin.Log;
 import org.apache.tools.ant.DefaultLogger;
 import org.apache.tools.ant.Project;
 

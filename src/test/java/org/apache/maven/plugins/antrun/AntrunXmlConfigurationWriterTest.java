@@ -18,13 +18,14 @@
  */
 package org.apache.maven.plugins.antrun;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
-import org.codehaus.plexus.configuration.PlexusConfiguration;
-import org.codehaus.plexus.configuration.xml.XmlPlexusConfiguration;
+import org.apache.maven.api.xml.XmlNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,28 +36,35 @@ import org.xmlunit.diff.Diff;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
- * Test class for {@link AntrunXmlPlexusConfigurationWriter}.
+ * Test class for {@link AntrunXmlConfigurationWriter}.
  * @author gboue
  */
-class AntrunXmlPlexusConfigurationWriterTest {
+class AntrunXmlConfigurationWriterTest {
 
     private static final String TARGET_NAME = "main";
 
     @TempDir
     Path folder;
 
-    private AntrunXmlPlexusConfigurationWriter configurationWriter;
+    private AntrunXmlConfigurationWriter configurationWriter;
 
-    private PlexusConfiguration configuration;
-
-    private File file;
+    private Path file;
 
     @BeforeEach
     void setUp() throws IOException {
-        configurationWriter = new AntrunXmlPlexusConfigurationWriter();
-        configuration = new XmlPlexusConfiguration("target");
-        configuration.setAttribute("name", TARGET_NAME);
-        file = Files.createTempFile(folder, "junit", "antrun").toFile();
+        configurationWriter = new AntrunXmlConfigurationWriter();
+        file = Files.createTempFile(folder, "junit", "antrun");
+    }
+
+    private static XmlNode target(Map<String, String> attributes, List<XmlNode> children) {
+        Map<String, String> all = new LinkedHashMap<>();
+        all.put("name", TARGET_NAME);
+        all.putAll(attributes);
+        return XmlNode.newInstance("target", null, all, children, null);
+    }
+
+    private static XmlNode node(String name, String value, Map<String, String> attributes) {
+        return XmlNode.newInstance(name, value, attributes, List.of(), null);
     }
 
     /**
@@ -66,7 +74,7 @@ class AntrunXmlPlexusConfigurationWriterTest {
      */
     @Test
     void basic() throws Exception {
-        configuration.getChild("echo", true).setAttribute("message", "Hello");
+        XmlNode configuration = target(Map.of(), List.of(node("echo", null, Map.of("message", "Hello"))));
         configurationWriter.write(configuration, file, "", TARGET_NAME);
         assertXmlIsExpected("/configuration-writer/basic.xml", file);
     }
@@ -78,7 +86,7 @@ class AntrunXmlPlexusConfigurationWriterTest {
      */
     @Test
     void emptyTarget() throws Exception {
-        configurationWriter.write(configuration, file, "", TARGET_NAME);
+        configurationWriter.write(target(Map.of(), List.of()), file, "", TARGET_NAME);
         assertXmlIsExpected("/configuration-writer/empty-target.xml", file);
     }
 
@@ -89,12 +97,11 @@ class AntrunXmlPlexusConfigurationWriterTest {
      */
     @Test
     void customTaskPrefix() throws Exception {
-        PlexusConfiguration child = configuration.getChild("mvn:foo", true);
-        child.setAttribute("attr1", "val1");
-        child.setValue("The first value.");
-        child = configuration.getChild("bar", true);
-        child.setAttribute("attr2", "val2");
-        child.setValue("The second value.");
+        XmlNode configuration = target(
+                Map.of(),
+                List.of(
+                        node("mvn:foo", "The first value.", Map.of("attr1", "val1")),
+                        node("bar", "The second value.", Map.of("attr2", "val2"))));
         configurationWriter.write(configuration, file, "mvn", TARGET_NAME);
         assertXmlIsExpected("/configuration-writer/custom-task-prefix.xml", file);
     }
@@ -107,16 +114,17 @@ class AntrunXmlPlexusConfigurationWriterTest {
      */
     @Test
     void combineAttributes() throws Exception {
-        configuration.setAttribute("combine.children", "append");
-        configuration.setAttribute("description", "foo");
-        configuration.getChild("child", true).setAttribute("combine.self", "override");
+        Map<String, String> attributes = new LinkedHashMap<>();
+        attributes.put("combine.children", "append");
+        attributes.put("description", "foo");
+        XmlNode configuration = target(attributes, List.of(node("child", null, Map.of("combine.self", "override"))));
         configurationWriter.write(configuration, file, "", TARGET_NAME);
         assertXmlIsExpected("/configuration-writer/combine-attributes.xml", file);
     }
 
-    private void assertXmlIsExpected(String expected, File file) {
+    private void assertXmlIsExpected(String expected, Path file) {
         Diff diff = DiffBuilder.compare(Input.from(getClass().getResourceAsStream(expected)))
-                .withTest(Input.from(file))
+                .withTest(Input.from(file.toFile()))
                 .checkForIdentical()
                 .build();
         assertFalse(diff.hasDifferences(), diff.toString());
