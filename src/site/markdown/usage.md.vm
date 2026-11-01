@@ -71,7 +71,7 @@ You can add a script to each lifecycle phase. Duplicate the `<execution/>` secti
 
 You can specify Ant [`<target/>`](http://ant.apache.org/manual/using.html#targets) attributes in the `<target/>` tag. The plugin wraps all Ant `<target/>` attributes except `depends`.
 
-```unknown
+```xml
 [...]
 <configuration>
   <target name="The name of the target"
