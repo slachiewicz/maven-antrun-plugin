@@ -30,14 +30,14 @@ The plugin sets a property in the Ant build for each project dependency. Each pr
 
 For example, to show the path to a jar dependency with groupId "org.apache" and artifactId "common-util", use this:
 
-```unknown
+```text
 #set( $D = '$' )
 <echo message="${D}{org.apache:common-util:jar}"/> 
 ```
 
 If the dependency includes a classifier, the plugin appends the classifier to the property name. For example, groupId "org.apache", artifactId "common-util", type "jar", and classifier "jdk14":
 
-```unknown
+```text
 #set( $D = '$' )
 <echo message="${D}{org.apache:common-util:jar:jdk14}"/> 
 ```
